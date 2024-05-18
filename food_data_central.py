@@ -5,7 +5,7 @@ class FoodCentral:
     __search_endpoint = __base_endpoint + 'foods/search'
     __list_endpoint = __base_endpoint + 'foods/list'
 
-    def _init_(self, food_combination:list=[], api_key:str=''):
+    def __init__(self, food_combination:list=[], api_key:str=''):
         self.__api_key = api_key
         self.__food_combination = food_combination
         return
