@@ -5,14 +5,13 @@ from datetime import datetime, date
 from googletrans import Translator
 
 class PreProcess:
-    def _init_(self, data_json):
-        self.data_json = data_json
+    def __init__(self):
         self.translator = Translator()
         self.food_central = fdc.FoodCentral()
 
         random.seed(37)
 
-        return preprocess()
+        return
 
     def translate(self, name, src='id', dest='en'):
         try:
@@ -33,14 +32,14 @@ class PreProcess:
 
             return age
         except:
-            return 20
+            return None
 
     def timestamp_to_int(self, time_string):
-    try:
-        time_obj = datetime.strptime(time_string, "%I:%M %p")
-        return time_obj.hour * 60 + time_obj.minute
-    except:
-        return 1380
+        try:
+            time_obj = datetime.strptime(time_string, "%I:%M %p")
+            return time_obj.hour * 60 + time_obj.minute
+        except:
+            return None
 
     def get_sleep_duration(self, sleep_time_string, wake_time_string):
         sleep_time = self.timestamp_to_int(sleep_time_string)
@@ -169,6 +168,22 @@ class PreProcess:
 
     def get_consumption_detail(self, consumptions):
         
+        if(len(consumptions) == 0):
+            total_detail = {
+                'energy': None,
+                'protein': None,
+                'carbohydrate': None,
+                'sugars': None,
+                'fiber': None,
+                'fat': None,
+                'saturated_fatty_acid': None,
+                'monounsaturated_fatty_acid': None,
+                'polyunsaturated_fatty_acid': None,
+                'cholesterol': None,
+                'calcium': None
+            }
+            return total_detail
+
         total_detail = {
             'energy': 0,
             'protein': 0,
@@ -226,27 +241,35 @@ class PreProcess:
 
     def get_vigorous_activity_minute(self, activities):
         
-        total_minutes = 0
+        total_minutes = None
         try:
-            for activity in activities:
+            for i, activity in enumerate(activities):
+                if(i == 0):
+                    total_minutes = 0
                 if(activity['heartRate'] > 142):
                     total_minutes += activity['duration']
         except:
             pass
         
         return total_minutes
+    
+    def get_bmi(self, weight, height):
+        if(weight == None or height == None):
+            return None
+        return weight/(height**2)
 
-    def preprocess(self):
+    def preprocess(self, data_json):
         # Take data in json string then preprocess and output np array
-        data_raw = json.loads(self.data_json)
+        data_raw = json.loads(data_json)
 
         age = {
             'Demog1_RIDAGEYR': self.get_age(data_raw['birth_date'])
         }
 
+        
         smoking = {
-            'Quest22_SMQ890': data_raw['have_smoked'],
-            'Quest22_SMQ900': data_raw['have_smoked_ecigarette']
+            'Quest22_SMQ890': 1 if data_raw['have_smoked'] else 2,
+            'Quest22_SMQ900': 1 if data_raw['have_smoked_ecigarette'] else 2
         }
 
         sleep = {
@@ -257,7 +280,7 @@ class PreProcess:
 
         # ! Need to Update !
         pain = {
-            'Quest3_CDQ008': 0
+            'Quest3_CDQ008': 9
         }
 
         consumption = data_raw['consumptions']
@@ -288,7 +311,7 @@ class PreProcess:
             'Quest19_PAD615': self.get_vigorous_activity_minute(activities)
         }
         
-        body_metrics = data_raw['bodyMetrics']
+        body_metrics = data_raw['body_metrics']
         if(body_metrics == None):
             body_metrics = {}
         height_weight = {
@@ -296,7 +319,7 @@ class PreProcess:
             'Exami2_BMXHT': body_metrics.get('bodyHeight'),
             'Exami2_BMXBMI': body_metrics.get(
                 'bmi',
-                body_metrics.get('bodyWeight')/(body_metrics.get('bodyHeight')**2)
+                self.get_bmi(body_metrics.get('bodyWeight'), body_metrics.get('bodyHeight'))
             ),
         }
 
