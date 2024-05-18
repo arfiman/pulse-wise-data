@@ -1,231 +1,325 @@
 import food_data_central as fdc
 
-import json
+import json, re, random, math
 from datetime import datetime, date
-import re
-import pandas as pd
+from googletrans import Translator
 
+class PreProcess:
+    def _init_(self, data_json):
+        self.data_json = data_json
+        self.translator = Translator()
+        self.food_central = fdc.FoodCentral()
 
-def get_age(birth_date_str):
-    try:
-        birth_date = datetime.strptime(birth_date_str, "%d %B %Y").date()
-        today = date.today()
+        random.seed(37)
 
-        age = today.year - birth_date.year
-        # Adjust for the case where the birth date hasn't occurred yet this year
-        if (today.month, today.day) < (birth_date.month, birth_date.day):
-            age -= 1
+        return preprocess()
 
-        return age
-    except:
-        return 20
-
-def timestamp_to_int(time_string):
-  try:
-    time_obj = datetime.strptime(time_string, "%I:%M %p")
-    return time_obj.hour * 60 + time_obj.minute
-  except:
-    return 1380
-
-def get_sleep_duration(sleep_time_string, wake_time_string):
-    sleep_time = timestamp_to_int(sleep_time_string)
-    wake_time = timestamp_to_int(wake_time_string)
-
-    if(sleep_time > wake_time):
-        wake_time += (24*60) # Add 24 hour to wake time to calculate sleep duraton
-    
-    return wake_time - sleep_time
-
-def get_portion(portion_string):
-    portion = re.search(r'\b\d+\b', portion_string)
-    if portion:
-        return portion.group()
-    else:
-        return 0
-
-def get_nutrient_value(nutrients, nutrient_name, nutrient_name_simple):
-    try:
-        nutrient = nutrients[nutrient_name]
-
-        # Standardize Metrics of Measurement for each nutrients
-        if nutrient_name_simple in ['energy']:
-            if(nutrient['unitName'] == "KCAL"):
-                multiplier = 1
-            else:
-                multiplier = 0
-        if nutrient_name_simple in ['protein', 'carbohydrate', 'sugars', 'fiber', 'fat', 'saturated_fatty_acid', 'monounsaturated_fatty_acid', 'polyunsaturated_fatty_acid']:
-            if(nutrient['unitName'] == "G"):
-                multiplier = 1
-            elif(nutrient['unitName'] == "MG"):
-                multiplier = 1000
-            elif(nutrient['unitName'] == "KG"):
-                multiplier = 0.001
-            else:
-                multiplier = 0
-        if nutrient_name_simple in ['cholesterol', 'calcium']:
-            if(nutrient['unitName'] == "G"):
-                multiplier = 0.001
-            elif(nutrient['unitName'] == "MG"):
-                multiplier = 1
-            elif(nutrient['unitName'] == "KG"):
-                multiplier = 0.000001
-            else:
-                multiplier = 0
-        
-        return nutrient['value'] * multiplier
-
-    except:
-        return 0
-
-
-
-def get_consumption_detail(consumptions):
-    if(not isinstance(consumptions, list)):
-        raise ValueError("Need to be list of consumptions")
-    
-    total_detail = {
-        'energy': 0,
-        'protein': 0,
-        'carbohydrate': 0,
-        'sugars': 0,
-        'fiber': 0,
-        'fat': 0,
-        'saturated_fatty_acid': 0,
-        'monounsaturated_fatty_acid': 0,
-        'polyunsaturated_fatty_acid': 0,
-        'cholesterol': 0,
-        'calcium': 0
-    }
-
-    food_central = fdc.FoodCentral()
-
-    for consumption in consumptions:
-        if(consumption['type'] == 'Minuman'):
-            continue
-        
-        # Might Need to Translate the consumption name first
-        food_name = consumption['name']
-
-        # Get Nutrient Detail From USDA Food Data Central
-        nutrient = food_central.get_nutrients(food_name)
+    def translate(self, name, src='id', dest='en'):
         try:
-            portion_multiplier = 100/get_portion(consumption['portion'])
+            translated = self.translator.translate(name, src=src, dest=dest)
+            return translated.text
         except:
-            portion_multiplier = 1
+            return name
 
-        detail = {}
-        if(nutrient['status'] == 200):
-            detail['energy'] = get_nutrient_value(nutrient['foodNutrients'], 'Energy', 'energy') * portion_multiplier
-            detail['protein'] = get_nutrient_value(nutrient['foodNutrients'], 'Protein', 'protein') * portion_multiplier
-            detail['carbohydrate'] = get_nutrient_value(nutrient['foodNutrients'], 'Carbohydrate, by difference', 'carbohydrate') * portion_multiplier
-            detail['sugars'] = get_nutrient_value(nutrient['foodNutrients'], 'Sugars, Total', 'sugars') * portion_multiplier
-            detail['fiber'] = get_nutrient_value(nutrient['foodNutrients'], 'Fiber, total dietary', 'fiber') * portion_multiplier
-            detail['fat'] = get_nutrient_value(nutrient['foodNutrients'], 'Total lipid (fat)', 'fat') * portion_multiplier
-            detail['saturated_fatty_acid'] = get_nutrient_value(nutrient['foodNutrients'], 'Fatty acids, total saturated', 'saturated_fatty_acid') * portion_multiplier
-            detail['monounsaturated_fatty_acid'] = get_nutrient_value(nutrient['foodNutrients'], 'Fatty acids, total monounsaturated', 'monounsaturated_fatty_acid') * portion_multiplier
-            detail['polyunsaturated_fatty_acid'] = get_nutrient_value(nutrient['foodNutrients'], 'Fatty acids, total polyunsaturated', 'polyunsaturated_fatty_acid') * portion_multiplier
-            detail['cholesterol'] = get_nutrient_value(nutrient['foodNutrients'], 'Cholesterol', 'cholesterol') * portion_multiplier
-            detail['calcium'] = get_nutrient_value(nutrient['foodNutrients'], 'Calcium, Ca', 'calcium') * portion_multiplier
+    def get_age(self, birth_date_str):
+        try:
+            birth_date = datetime.strptime(birth_date_str, "%d %B %Y").date()
+            today = date.today()
+
+            age = today.year - birth_date.year
+            # Adjust for the case where the birth date hasn't occurred yet this year
+            if (today.month, today.day) < (birth_date.month, birth_date.day):
+                age -= 1
+
+            return age
+        except:
+            return 20
+
+    def timestamp_to_int(self, time_string):
+    try:
+        time_obj = datetime.strptime(time_string, "%I:%M %p")
+        return time_obj.hour * 60 + time_obj.minute
+    except:
+        return 1380
+
+    def get_sleep_duration(self, sleep_time_string, wake_time_string):
+        sleep_time = self.timestamp_to_int(sleep_time_string)
+        wake_time = self.timestamp_to_int(wake_time_string)
+
+        if(sleep_time > wake_time):
+            wake_time += (24*60) # Add 24 hour to wake time to calculate sleep duraton
         
-        # Update total nutrients
-        for key in total_detail:
-            if key in detail:
-                total_detail[key] += detail[key]
-    
-    return total_detail
+        return wake_time - sleep_time
 
-def get_vigorous_activity_minute(activities):
-    if(not isinstance(activities, list)):
-        raise ValueError("Need to be list of activities")
-    
-    total_minutes = 0
+    def get_portion(self, portion_string):
+        portion = re.search(r'\b\d+\b', portion_string)
+        if portion:
+            return portion.group()
+        else:
+            return 0
 
-    for activity in activities:
-        if(activity['heartRate'] > 142):
-            total_minutes += activity['duration']
-    
-    return total_minutes
+    def get_nutrient_value(self, nutrients, nutrient_name, nutrient_name_simple):
+        try:
+            nutrient = nutrients[nutrient_name]
 
-def preprocess(data_json):
-    # Take data in json string then preprocess and output np array
-    data_raw = json.loads(data_json)
+            # Standardize Metrics of Measurement for each nutrients
+            if nutrient_name_simple in ['energy']:
+                if(nutrient['unitName'] == "KCAL"):
+                    multiplier = 1
+                else:
+                    multiplier = 0
+            if nutrient_name_simple in ['protein', 'carbohydrate', 'sugars', 'fiber', 'fat', 'saturated_fatty_acid', 'monounsaturated_fatty_acid', 'polyunsaturated_fatty_acid']:
+                if(nutrient['unitName'] == "G"):
+                    multiplier = 1
+                elif(nutrient['unitName'] == "MG"):
+                    multiplier = 1000
+                elif(nutrient['unitName'] == "KG"):
+                    multiplier = 0.001
+                else:
+                    multiplier = 0
+            if nutrient_name_simple in ['cholesterol', 'calcium']:
+                if(nutrient['unitName'] == "G"):
+                    multiplier = 0.001
+                elif(nutrient['unitName'] == "MG"):
+                    multiplier = 1
+                elif(nutrient['unitName'] == "KG"):
+                    multiplier = 0.000001
+                else:
+                    multiplier = 0
+            
+            return nutrient['value'] * multiplier
 
-    age = {
-        'Demog1_RIDAGEYR': get_age(data_raw['birth_date'])
-    }
+        except:
+            return 0
 
-    smoking = {
-        'Quest22_SMQ890': data_raw['have_smoked'],
-        'Quest22_SMQ900': data_raw['have_smoked_ecigarette']
-    }
+    def get_nutrient_summary(self, food_name, num_samples=30):
+        # First Iteration: Check Food Name from Foundation type
+        try:
+            nutrients, num_hits = self.food_central.get_nutrients(food_name, data_type=['Foundation'])
+            if(num_hits > 0):
+                return nutrient[0]
+        except:
+            pass
+        
+        # Second Iteration: Check Food Name from Branded type, sample 30 hit
+        try:
+            nutrients, num_hits = self.food_central.get_nutrients(food_name, data_type=['Branded'])
+            if(num_hits > 0):
+                nutrient = nutrients[0]
+                for i, val in enumerate(random.sample(nutrients, num_samples=math.min(num_samples, num_hits))):
+                    if(i == 0):
+                        continue
+                    
+                    list_of_key = list(set(nutrient['foodNutrients'])+set(val['foodNutrients']))
+                    for key in list_of_key:
+                        nutrient['foodNutrients'][key] = nutrient['foodNutrients'].get(key, 0) + val['foodNutrients'].get(key, 0)
+                    
+                return nutrient
+        except:
+            pass
+        
+        # Third Iteration: Check Food Name from Foundation type, by individual words (get the fewest non zero hit)
+        try:
+            fewest_hit = 1e8
+            nutrients = None
+            for i, word in food_name.split(' '):
+                # Limit to the first 3 words to search individually
+                if(i >= 3):
+                    break
+                nutrients_temp, num_hits = self.food_central.get_nutrients(word, data_type=['Foundation'])
 
-    sleep = {
-        'Quest21_SLQ300': timestamp_to_int(data_raw['sleep_time']),
-        'Quest21_SLQ330': timestamp_to_int(data_raw['wake_time']),
-        'Quest21_SLD012': get_sleep_duration(data_raw['sleep_time'], data_raw['wake_time'])
-    }
+                if(num_hits < fewest_hit and num_hits != 0):
+                    nutrients = nutrients_temp
+                    fewest_hit = num_hits
+            
+            if(nutrients != None):
+                return nutrients[0]
+        except:
+            pass
 
-    # ! Need to Update !
-    pain = {
-        'Quest3_CDQ008': 0
-    }
+        # Fourth Iteration: Check Food Name from Branded type, by individual words (get the fewest non zero hit)
+        try:
+            fewest_hit = 1e8
+            nutrients = None
+            for i, word in food_name.split(' '):
+                # Limit to the first 3 words to search individually
+                if(i >= 3):
+                    break
+                nutrients_temp, num_hits = self.food_central.get_nutrients(word, data_type=['Branded'])
 
-    consumption = data_raw['consumptions']
-    if(consumption == None):
-        consumption = []
+                if(num_hits < fewest_hit and num_hits != 0):
+                    nutrients = nutrients_temp
+                    fewest_hit = num_hits
+            
+            if(nutrients != None):
+                nutrient = nutrients[0]
+                for i, val in enumerate(random.sample(nutrients, num_samples=math.min(num_samples, num_hits))):
+                    if(i == 0):
+                        continue
+                    
+                    list_of_key = list(set(nutrient['foodNutrients'])+set(val['foodNutrients']))
+                    for key in list_of_key:
+                        nutrient['foodNutrients'][key] = nutrient['foodNutrients'].get(key, 0) + val['foodNutrients'].get(key, 0)
+                    
+                return nutrient
+        except:
+            pass
+        
+        return {'status': 400, 'totalHits': 0}
 
-    dietary_detail = get_consumption_detail(consumption)
-    dietary = {
-        'Dieta1_DR1TKCAL': dietary_detail['energy'],
-        'Dieta1_DR1TPROT': dietary_detail['protein'],
-        'Dieta1_DR1TCARB': dietary_detail['carbohydrate'],
-        'Dieta1_DR1TSUGR': dietary_detail['sugars'],
-        'Dieta1_DR1TFIBE': dietary_detail['fiber'],
-        'Dieta1_DR1TTFAT': dietary_detail['fat'],
-        'Dieta1_DR1TTFAT': dietary_detail['fat'],
-        'Dieta1_DR1TSFAT': dietary_detail['saturated_fatty_acid'],
-        'Dieta1_DR1TSFAT': dietary_detail['saturated_fatty_acid'],
-        'Dieta1_DR1TMFAT': dietary_detail['monounsaturated_fatty_acid'],
-        'Dieta1_DR1TPFAT': dietary_detail['polyunsaturated_fatty_acid'],
-        'Dieta1_DR1TCHOL': dietary_detail['cholesterol'],
-        'Dieta1_DR1TCALC': dietary_detail['calcium'],
-    }
+    def get_consumption_detail(self, consumptions):
+        
+        total_detail = {
+            'energy': 0,
+            'protein': 0,
+            'carbohydrate': 0,
+            'sugars': 0,
+            'fiber': 0,
+            'fat': 0,
+            'saturated_fatty_acid': 0,
+            'monounsaturated_fatty_acid': 0,
+            'polyunsaturated_fatty_acid': 0,
+            'cholesterol': 0,
+            'calcium': 0
+        }
 
-    activities = dietary_detail['activities']
-    if(activities == None):
-        activities = []
-    activity = {
-        'Quest19_PAD615': get_vigorous_activity_minute(activities)
-    }
-    
-    body_metrics = data_raw['bodyMetrics']
-    if(body_metrics == None):
-        body_metrics = {}
-    height_weight = {
-        'Exami2_BMXWT': body_metrics.get('bodyWeight'),
-        'Exami2_BMXHT': body_metrics.get('bodyHeight'),
-        'Exami2_BMXBMI': body_metrics.get(
-            'bmi',
-            body_metrics.get('bodyWeight')/(body_metrics.get('bodyHeight')**2)
-        ),
-    }
+        try:
+            for consumption in consumptions:
+                # Translate Food name from id to en
+                food_name = translate(consumption['name'])
 
-    pressure = {
-        'Exami1_SysPulse': body_metrics.get('systolicPressure'),
-        'Exami1_DiaPulse': body_metrics.get('diastolicPressure')
-    }
+                # Hardcode to exclude water / mineral water
+                if(lower(food_name) in ['water', 'mineral water']):
+                    continue
 
-    # Rearrage Data for Model Consumption
-    data = {}
+                # Get Nutrient Detail From USDA Food Data Central
+                nutrients = get_nutrient_summary(food_name)
+                
+                # Nutrient from FDA is for every 100 gr/ml food
+                try:
+                    portion_multiplier = 100/get_portion(consumption['portion'])
+                except:
+                    portion_multiplier = 1
 
-    # Lifestyle
-    data.update(smoking)
-    data.update(sleep)
-    data.update(dietary)
-    data.update(activity)
+                detail = {}
+                if(nutrient['status'] == 200):
+                    detail['energy'] = self.get_nutrient_value(nutrient['foodNutrients'], 'Energy', 'energy') * portion_multiplier
+                    detail['protein'] = self.get_nutrient_value(nutrient['foodNutrients'], 'Protein', 'protein') * portion_multiplier
+                    detail['carbohydrate'] = self.get_nutrient_value(nutrient['foodNutrients'], 'Carbohydrate, by difference', 'carbohydrate') * portion_multiplier
+                    detail['sugars'] = self.get_nutrient_value(nutrient['foodNutrients'], 'Sugars, Total', 'sugars') * portion_multiplier
+                    detail['fiber'] = get_nutrient_value(nutrient['foodNutrients'], 'Fiber, total dietary', 'fiber') * portion_multiplier
+                    detail['fat'] = self.get_nutrient_value(nutrient['foodNutrients'], 'Total lipid (fat)', 'fat') * portion_multiplier
+                    detail['saturated_fatty_acid'] = self.get_nutrient_value(nutrient['foodNutrients'], 'Fatty acids, total saturated', 'saturated_fatty_acid') * portion_multiplier
+                    detail['monounsaturated_fatty_acid'] = self.get_nutrient_value(nutrient['foodNutrients'], 'Fatty acids, total monounsaturated', 'monounsaturated_fatty_acid') * portion_multiplier
+                    detail['polyunsaturated_fatty_acid'] = self.get_nutrient_value(nutrient['foodNutrients'], 'Fatty acids, total polyunsaturated', 'polyunsaturated_fatty_acid') * portion_multiplier
+                    detail['cholesterol'] = self.get_nutrient_value(nutrient['foodNutrients'], 'Cholesterol', 'cholesterol') * portion_multiplier
+                    detail['calcium'] = self.get_nutrient_value(nutrient['foodNutrients'], 'Calcium, Ca', 'calcium') * portion_multiplier
+                
+                # Update total nutrients
+                for key in total_detail:
+                    if key in detail:
+                        total_detail[key] += detail[key]
+        except:
+            pass
+        
+        return total_detail
 
-    # Characteristics
-    data.update(age)
-    data.update(height_weight)
-    data.update(pain)
-    data.update(pressure)
+    def get_vigorous_activity_minute(self, activities):
+        
+        total_minutes = 0
+        try:
+            for activity in activities:
+                if(activity['heartRate'] > 142):
+                    total_minutes += activity['duration']
+        except:
+            pass
+        
+        return total_minutes
+
+    def preprocess(self):
+        # Take data in json string then preprocess and output np array
+        data_raw = json.loads(self.data_json)
+
+        age = {
+            'Demog1_RIDAGEYR': self.get_age(data_raw['birth_date'])
+        }
+
+        smoking = {
+            'Quest22_SMQ890': data_raw['have_smoked'],
+            'Quest22_SMQ900': data_raw['have_smoked_ecigarette']
+        }
+
+        sleep = {
+            'Quest21_SLQ300': self.timestamp_to_int(data_raw['sleep_time']),
+            'Quest21_SLQ330': self.timestamp_to_int(data_raw['wake_time']),
+            'Quest21_SLD012': self.get_sleep_duration(data_raw['sleep_time'], data_raw['wake_time'])
+        }
+
+        # ! Need to Update !
+        pain = {
+            'Quest3_CDQ008': 0
+        }
+
+        consumption = data_raw['consumptions']
+        if(consumption == None):
+            consumption = []
+
+        dietary_detail = self.get_consumption_detail(consumption)
+        dietary = {
+            'Dieta1_DR1TKCAL': dietary_detail['energy'],
+            'Dieta1_DR1TPROT': dietary_detail['protein'],
+            'Dieta1_DR1TCARB': dietary_detail['carbohydrate'],
+            'Dieta1_DR1TSUGR': dietary_detail['sugars'],
+            'Dieta1_DR1TFIBE': dietary_detail['fiber'],
+            'Dieta1_DR1TTFAT': dietary_detail['fat'],
+            'Dieta1_DR1TTFAT': dietary_detail['fat'],
+            'Dieta1_DR1TSFAT': dietary_detail['saturated_fatty_acid'],
+            'Dieta1_DR1TSFAT': dietary_detail['saturated_fatty_acid'],
+            'Dieta1_DR1TMFAT': dietary_detail['monounsaturated_fatty_acid'],
+            'Dieta1_DR1TPFAT': dietary_detail['polyunsaturated_fatty_acid'],
+            'Dieta1_DR1TCHOL': dietary_detail['cholesterol'],
+            'Dieta1_DR1TCALC': dietary_detail['calcium'],
+        }
+
+        activities = data_raw['activities']
+        if(activities == None):
+            activities = []
+        activity = {
+            'Quest19_PAD615': self.get_vigorous_activity_minute(activities)
+        }
+        
+        body_metrics = data_raw['bodyMetrics']
+        if(body_metrics == None):
+            body_metrics = {}
+        height_weight = {
+            'Exami2_BMXWT': body_metrics.get('bodyWeight'),
+            'Exami2_BMXHT': body_metrics.get('bodyHeight'),
+            'Exami2_BMXBMI': body_metrics.get(
+                'bmi',
+                body_metrics.get('bodyWeight')/(body_metrics.get('bodyHeight')**2)
+            ),
+        }
+
+        pressure = {
+            'Exami1_SysPulse': body_metrics.get('systolicPressure'),
+            'Exami1_DiaPulse': body_metrics.get('diastolicPressure')
+        }
+
+        # Rearrage Data for Model Consumption
+        data = {}
+
+        # Lifestyle
+        data.update(smoking)
+        data.update(sleep)
+        data.update(dietary)
+        data.update(activity)
+
+        # Characteristics
+        data.update(age)
+        data.update(height_weight)
+        data.update(pain)
+        data.update(pressure)
+
+        ret = json.dumps(data)
+
+        return data
