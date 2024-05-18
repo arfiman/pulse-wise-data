@@ -13,19 +13,24 @@ class FoodCentral:
     def deconstruct_food(self, food_combination):
         return
 
-    def get_nutrients(self, keyword):
+    def get_nutrients(self, keyword, data_type=['Foundation'], sort_by='publishedDate', sort_order='desc', require_all_words='true'):
         params = {
             'api_key': self.__api_key,
             'query': keyword,
-            'dataType': ['Foundation'],
-            'sortBy': 'publishedDate',
-            'sortOrder': 'desc'
+            'dataType': data_type,
+            'sortBy': sort_by,
+            'sortOrder': sort_order,
+            'requireAllWords': require_all_words
         }
 
         response = requests.get(self.__search_endpoint, params=params)
-        try:
-            if response.json()['totalHits'] > 0:
-                food = response.json()['foods'][0]
+        
+        obj_data_list = []
+
+        for i, food in enumerate(response.json()['food']):
+            num_hits = 0
+            obj_data = {'rank': i}
+            try:
                 obj_data = {
                     'query': response.json()['foodSearchCriteria']['query'],
                     'description': food['description'],
@@ -43,12 +48,9 @@ class FoodCentral:
                         'value': nutrient['value'],
                         'unitName': nutrient['unitName'],
                     }
-            else:
-                raise Exception
-        except:
-            obj_data = {
-                'query': response.json()['foodSearchCriteria']['query'],
-                'status': response.status_code
-            }
+                num_hits += 1
+                obj_data_list.append(obj_data)
+            except:
+                pass
 
-        return obj_data
+        return obj_data_list, num_hits
