@@ -105,7 +105,7 @@ class PreProcess:
             nutrients, num_hits = self.food_central.get_nutrients(food_name, data_type=['Branded'])
             if(num_hits > 0):
                 nutrient = nutrients[0]
-                for i, val in enumerate(random.sample(nutrients, num_samples=math.min(num_samples, num_hits))):
+                for i, val in enumerate(random.sample(nutrients, num_samples=min(num_samples, num_hits))):
                     if(i == 0):
                         continue
                     
@@ -152,7 +152,7 @@ class PreProcess:
             
             if(nutrients != None):
                 nutrient = nutrients[0]
-                for i, val in enumerate(random.sample(nutrients, num_samples=math.min(num_samples, num_hits))):
+                for i, val in enumerate(random.sample(nutrients, num_samples=min(num_samples, num_hits))):
                     if(i == 0):
                         continue
                     
