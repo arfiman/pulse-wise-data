@@ -201,18 +201,18 @@ class PreProcess:
         try:
             for consumption in consumptions:
                 # Translate Food name from id to en
-                food_name = translate(consumption['name'])
+                food_name = self.translate(consumption['name'])
 
                 # Hardcode to exclude water / mineral water
-                if(lower(food_name) in ['water', 'mineral water']):
+                if(food_name.lower() in ['water', 'mineral water']):
                     continue
 
                 # Get Nutrient Detail From USDA Food Data Central
-                nutrients = get_nutrient_summary(food_name)
+                nutrient = self.get_nutrient_summary(food_name)
                 
                 # Nutrient from FDA is for every 100 gr/ml food
                 try:
-                    portion_multiplier = 100/get_portion(consumption['portion'])
+                    portion_multiplier = 100/self.get_portion(consumption['portion'])
                 except:
                     portion_multiplier = 1
 
@@ -222,7 +222,7 @@ class PreProcess:
                     detail['protein'] = self.get_nutrient_value(nutrient['foodNutrients'], 'Protein', 'protein') * portion_multiplier
                     detail['carbohydrate'] = self.get_nutrient_value(nutrient['foodNutrients'], 'Carbohydrate, by difference', 'carbohydrate') * portion_multiplier
                     detail['sugars'] = self.get_nutrient_value(nutrient['foodNutrients'], 'Sugars, Total', 'sugars') * portion_multiplier
-                    detail['fiber'] = get_nutrient_value(nutrient['foodNutrients'], 'Fiber, total dietary', 'fiber') * portion_multiplier
+                    detail['fiber'] = self.get_nutrient_value(nutrient['foodNutrients'], 'Fiber, total dietary', 'fiber') * portion_multiplier
                     detail['fat'] = self.get_nutrient_value(nutrient['foodNutrients'], 'Total lipid (fat)', 'fat') * portion_multiplier
                     detail['saturated_fatty_acid'] = self.get_nutrient_value(nutrient['foodNutrients'], 'Fatty acids, total saturated', 'saturated_fatty_acid') * portion_multiplier
                     detail['monounsaturated_fatty_acid'] = self.get_nutrient_value(nutrient['foodNutrients'], 'Fatty acids, total monounsaturated', 'monounsaturated_fatty_acid') * portion_multiplier
@@ -257,6 +257,16 @@ class PreProcess:
         if(weight == None or height == None):
             return None
         return weight/(height**2)
+    
+    def is_having_pain(self, symptoms):
+        if(len(symptoms) == 0):
+            return 9
+
+        for symptom in symptoms:
+            if symptom.get('name') == 'Pain in Chest Area':
+                return 1
+        
+        return 2
 
     def preprocess(self, data_json):
         # Take data in json string then preprocess and output np array
@@ -278,9 +288,11 @@ class PreProcess:
             'Quest21_SLD012': self.get_sleep_duration(data_raw['sleep_time'], data_raw['wake_time'])
         }
 
-        # ! Need to Update !
+        symptoms = data_raw['symptoms']
+        if(symptoms == None):
+            symptoms = []
         pain = {
-            'Quest3_CDQ008': 9
+            'Quest3_CDQ008': self.is_having_pain(symptoms)
         }
 
         consumption = data_raw['consumptions']
