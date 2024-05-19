@@ -54,6 +54,7 @@ class FireBase:
             data['activities'] = diary_data.get('activities', None)
             data['body_metrics'] = diary_data.get('bodyMetrics', None)
             data['consumptions'] = diary_data.get('consumptions', None)
+            data['symptoms'] = diary_data.get('symptoms', None)
 
         # Data From Profile
         user_data = self.db.collection('user').document(user_id).get()
@@ -71,8 +72,4 @@ class FireBase:
         data_json = json.dumps(data)
 
         return data_json
-
     
-
-
-
